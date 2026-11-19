@@ -1,0 +1,21 @@
+# R session state: never rely on a saved workspace
+.RData
+.RDataTmp
+.Rhistory
+.Rapp.history
+.Rproj.user/
+
+# Fitted model objects (large; regenerate with analysis/01_fit_models.R)
+results/models/
+
+# Package build/check artefacts
+*.tar.gz
+*.Rcheck/
+
+# Editor / OS / office lock files
+.~lock.*#
+*~
+.DS_Store
+
+# Diagnostic PDFs are ~3 MB each; the PNGs are committed instead
+results/figures/diagnostics/*.pdf

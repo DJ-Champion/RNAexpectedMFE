@@ -1,0 +1,9 @@
+^.*\.Rproj$
+^\.Rproj\.user$
+^analysis$
+^data-raw$
+^results$
+^docs$
+^README\.md$
+^LICENSE\.md$
+^\.gitignore$
