@@ -5,9 +5,6 @@
 .Rapp.history
 .Rproj.user/
 
-# Fitted model objects (large; regenerate with analysis/01_fit_models.R)
-results/models/
-
 # Package build/check artefacts
 *.tar.gz
 *.Rcheck/

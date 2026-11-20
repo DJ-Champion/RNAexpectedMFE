@@ -4,7 +4,7 @@
 # Outputs:
 #   R/coefficients.R                    coefficients used by expected_mfe()
 #   results/tables/model_coefficients.csv
-#   results/models/fits.rds             nls objects (git-ignored)
+#   results/models/fits.rds             nls objects
 
 source("analysis/R/setup.R")
 
