@@ -22,6 +22,7 @@ theme_rnaexpected <- function(base_size = 11) {
       axis.title = element_text(colour = ink_muted),
       axis.text = element_text(colour = ink_muted),
       plot.title = element_text(colour = ink, face = "bold"),
+      plot.subtitle = element_text(colour = ink_muted),
       plot.caption = element_text(colour = ink_muted, hjust = 0),
       plot.title.position = "plot",
       plot.caption.position = "plot",
@@ -58,35 +59,87 @@ save_figure <- function(plot, name, width = 8, height = 5,
 }
 
 # --- Key figures --------------------------------------------------------------
+#
+# Both figures use the same encoding: observed means in colour, the model as a
+# black dashed line. Each has a linear and a log version. MFE is negative, so
+# the log version plots it on a log scale of its magnitude while keeping the
+# sign and orientation: -1, -10, -100, -1000 run down the axis. Zero MFEs
+# (short, GC-poor sequences, and the capped model there) cannot be shown on
+# that scale and are dropped.
 
-plot_mfe_vs_length <- function(cells, model = "C", overlay_gc = seq(0, 100, 10)) {
-  ggplot(cells, aes(length, MFE, colour = target_GC, group = target_GC)) +
-    geom_line(linewidth = 0.45) +
-    geom_line(data = filter(cells, target_GC %in% overlay_gc),
-              aes(y = expected), colour = ink, linewidth = 0.3, linetype = "22") +
-    scale_colour_gc() +
-    scale_x_continuous(breaks = seq(0, 4000, 500), expand = expansion(0.01)) +
-    labs(title = "Mean MFE vs sequence length, by GC content",
-         x = "Sequence length (nt)", y = "Mean MFE (kcal/mol)",
-         caption = paste0("Coloured: mean of 10 RNAfold replicates per length and target GC (2% steps). ",
-                          "Dashed: model ", model, " at GC 0, 10, ..., 100%.")) +
-    theme_rnaexpected()
+key_figure_size <- 16
+key_figure_gc <- seq(0, 100, 10)
+
+neg_log10_trans <- scales::new_transform(
+  "neg_log10",
+  transform = function(x) -log10(-x),
+  inverse   = function(x) -10^(-x),
+  domain    = c(-Inf, 0)
+)
+
+scale_y_mfe <- function(log = FALSE) {
+  labels <- scales::label_number(big.mark = ",")
+  if (log) {
+    scale_y_continuous(transform = neg_log10_trans, labels = labels,
+                       breaks = -c(1, 3, 10, 30, 100, 300, 1000, 3000))
+  } else {
+    scale_y_continuous(labels = labels)
+  }
 }
 
-plot_mfe_vs_gc <- function(cells, model = "C", lengths = selected_lengths) {
-  cells |>
-    filter(length %in% lengths) |>
-    mutate(length = factor(length, levels = lengths)) |>
-    ggplot(aes(GC_content * 100, colour = length)) +
-    geom_line(aes(y = expected), linewidth = 0.5) +
-    geom_point(aes(y = MFE), size = 1.4) +
+model_key <- function(model) {
+  scale_linetype_manual(values = set_names("22", paste("Model", model)),
+                        name = NULL)
+}
+
+plot_mfe_vs_length <- function(cells, model = "C", gc_levels = key_figure_gc,
+                               log = FALSE) {
+  d <- filter(cells, target_GC %in% gc_levels) |>
+    mutate(gc = factor(target_GC, levels = gc_levels))
+  if (log) d <- filter(d, MFE < 0)
+
+  p <- ggplot(d, aes(length, colour = gc, group = gc)) +
+    geom_line(aes(y = MFE), linewidth = 0.7) +
+    geom_line(data = if (log) filter(d, expected < 0) else d,
+              aes(y = expected, linetype = paste("Model", model)),
+              colour = ink, linewidth = 0.45) +
+    scale_colour_manual(values = colorRampPalette(blue_ramp)(length(gc_levels)),
+                        name = "GC (%)") +
+    model_key(model) +
+    scale_y_mfe(log) +
+    guides(colour = guide_legend(order = 1), linetype = guide_legend(order = 2)) +
+    labs(title = paste0("Mean MFE vs sequence length, by GC content",
+                        if (log) " (log scale)"),
+         x = "Sequence length (nt)", y = "Mean MFE (kcal/mol)") +
+    theme_rnaexpected(key_figure_size)
+
+  if (log) {
+    p + scale_x_log10(breaks = c(20, 50, 100, 200, 500, 1000, 2000, 4000))
+  } else {
+    p + scale_x_continuous(breaks = seq(0, 4000, 1000), expand = expansion(0.01))
+  }
+}
+
+plot_mfe_vs_gc <- function(cells, model = "C", lengths = selected_lengths,
+                           log = FALSE) {
+  d <- filter(cells, length %in% lengths) |>
+    mutate(length = factor(length, levels = lengths))
+  if (log) d <- filter(d, MFE < 0)
+
+  ggplot(d, aes(GC_content * 100, colour = length, group = length)) +
+    geom_point(aes(y = MFE), size = 2) +
+    geom_line(data = if (log) filter(d, expected < 0) else d,
+              aes(y = expected, linetype = paste("Model", model)),
+              colour = ink, linewidth = 0.45) +
     scale_colour_length() +
-    scale_x_continuous(breaks = seq(0, 100, 10), expand = expansion(0.01)) +
-    labs(title = "Mean MFE vs GC content, by sequence length",
-         x = "Measured GC content (%)", y = "Mean MFE (kcal/mol)",
-         caption = paste0("Points: mean of 10 RNAfold replicates per target GC. ",
-                          "Lines: model ", model, ".")) +
-    theme_rnaexpected()
+    model_key(model) +
+    scale_y_mfe(log) +
+    scale_x_continuous(breaks = seq(0, 100, 20), expand = expansion(0.01)) +
+    guides(colour = guide_legend(order = 1), linetype = guide_legend(order = 2)) +
+    labs(title = paste0("Mean MFE vs GC content, by sequence length",
+                        if (log) " (log scale)"),
+         x = "Measured GC content (%)", y = "Mean MFE (kcal/mol)") +
+    theme_rnaexpected(key_figure_size)
 }
 
 # --- Diagnostics ----------------------------------------------------------------
@@ -148,6 +201,58 @@ plot_diagnostics <- function(cells, model, limits) {
       caption = "Residuals are observed minus expected MFE, averaged over the 10 replicates in each design cell.",
       theme = theme_rnaexpected()
     )
+}
+
+# Relative error of each model on the synthetic data along the length axis,
+# above the length distributions of real human transcript regions, so it reads
+# as "how far off is the expected MFE at lengths like my regions?". Titles make
+# clear the error is measured on synthetic sequences, not on the transcripts.
+plot_error_vs_length <- function(rel, regions) {
+  x_limits <- c(20, 40000)
+  x_breaks <- c(20, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000)
+  beyond <- annotate("rect", xmin = fitted_range$length[2], xmax = Inf,
+                     ymin = -Inf, ymax = Inf, fill = neutral_mid)
+  scale_x <- scale_x_log10(limits = x_limits, breaks = x_breaks,
+                           labels = scales::label_number(big.mark = ","),
+                           expand = c(0, 0))
+
+  error <- ggplot(rel, aes(length, rel_error, colour = model)) +
+    beyond +
+    annotate("text", x = 12000, y = Inf, vjust = 1.5, size = 4.5,
+             label = "Beyond training\ndata (> 4,000 nt)", colour = ink_muted) +
+    geom_hline(yintercept = 0, colour = ink_muted, linewidth = 0.3) +
+    geom_line(linewidth = 0.7) +
+    scale_colour_manual(values = model_colours, name = "Model") +
+    scale_x +
+    # Zoomed to the useful range; below ~40 nt errors run off towards -100%.
+    scale_y_continuous(breaks = seq(-50, 10, 10)) +
+    coord_cartesian(ylim = c(-50, 10)) +
+    labs(title = "Expected-MFE model error on synthetic random sequences",
+         subtitle = "Median relative error of replicate means vs sequence length",
+         x = NULL,
+         y = paste0("Relative error (%)\nGC ", rel_error_gc[1], "-",
+                    rel_error_gc[2], "%")) +
+    theme_rnaexpected(key_figure_size) +
+    theme(axis.text.x = element_blank())
+
+  lengths <- regions |>
+    filter(measure == "length") |>
+    mutate(region = factor(region, levels = rev(unique(region))))
+  ranges <- ggplot(lengths, aes(y = region)) +
+    beyond +
+    geom_linerange(aes(xmin = min, xmax = max), colour = ink_muted,
+                   linewidth = 0.5) +
+    geom_linerange(aes(xmin = q1, xmax = q3), colour = ink_muted,
+                   linewidth = 5) +
+    geom_point(aes(x = median), shape = 21, size = 3.5, fill = "white",
+               colour = ink, stroke = 1) +
+    scale_x +
+    labs(subtitle = "For reference: lengths of human transcript regions (~13,000 transcripts)",
+         x = "Sequence length (nt)", y = NULL) +
+    theme_rnaexpected(key_figure_size) +
+    theme(panel.grid.major.y = element_blank())
+
+  error / ranges + plot_layout(heights = c(3, 1.3))
 }
 
 plot_rmse_by_length <- function(by_length) {

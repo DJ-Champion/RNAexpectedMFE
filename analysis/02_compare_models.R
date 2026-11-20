@@ -43,6 +43,6 @@ for (name in names(cells)) {
               dir = "results/figures/diagnostics")
 }
 
-print(select(comparison, model, n_params, r2, rmse, cell_mean_rmse,
-             heldout_rmse, delta_aic), width = Inf)
+print(select(comparison, model, n_params, r2, rmse, weighted_rmse,
+             cell_mean_rmse, heldout_rmse, delta_aic), width = Inf)
 print(by_length, n = Inf)

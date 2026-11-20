@@ -12,31 +12,42 @@ The recommended model (C) is
 
 ```
 expected MFE = (a · GC^b + c) · length + d,   capped at 0 kcal/mol
-a = -0.8403211   b = 2.3521346   c = -0.1534110   d = 13.5600942
+a = -0.8392021   b = 2.3535788   c = -0.1517445   d = 9.3178327
 ```
 
 with GC as a fraction (0–1) and length in nt. It was fitted to 406,470
-synthetic sequences spanning 20–4000 nt and 0–100% GC, and predicts individual
-sequences with an RMSE of about 19 kcal/mol (R² = 0.9994). See
-[docs/methods.md](docs/methods.md) for the full method, model comparison and
-limitations.
+synthetic sequences spanning 20–4000 nt and 0–100% GC, by nonlinear least
+squares weighted by 1/length (MFE noise grows with length). Its systematic
+error is about 1–3.5% for sequences of 100–4000 nt, but it predicts too little
+structure for very short sequences (about −13% at 50–100 nt), and lengths
+above 4000 nt are extrapolated. See [docs/methods.md](docs/methods.md) for the
+full method, model comparison and limitations.
+
+**Coefficient change (November 2026):** switching from an unweighted to a
+1/length-weighted fit changed model C's coefficients (mainly d: 13.56 → 9.32).
+Projects that hard-code the older values (`mRNA_stability_R`, `RNAstab`)
+need updating.
 
 ## Using the R package
 
-Install from a local clone (or with `remotes::install_github()` once the
-GitHub repository exists):
+Install from GitHub (the repository is `RNAexpectedMFE`; the package is
+`RNAexpected`):
 
 ```r
-install.packages("path/to/RNAexpected", repos = NULL, type = "source")
+# install.packages("remotes")
+remotes::install_github("DJ-Champion/RNAexpectedMFE")
 ```
+
+or from a local clone with
+`install.packages("path/to/RNAexpectedMFE", repos = NULL, type = "source")`.
 
 ```r
 library(RNAexpected)
 
 expected_mfe(gc = 0.45, length = 1500)
-#> [1] -409.2405
+#> [1] -410.5045
 expected_mfe(gc = c(0.3, 0.5, 0.7), length = 1000)
-#> [1] -189.3463 -304.4329 -503.0084
+#> [1] -191.7702 -306.6250 -504.9138
 expected_mfe(0.45, 1500, model = "A")   # alternative models A, B, C
 expected_mfe_coefficients("C")
 ```
@@ -65,9 +76,9 @@ This takes about 2 minutes and needs `dplyr`, `ggplot2`, `patchwork`, `purrr`,
 
 | Script | Does | Writes |
 |---|---|---|
-| `analysis/01_fit_models.R` | Fits models A, B and C to all sequences, and to replicates 1–8 for a held-out check | `R/coefficients.R`, `results/tables/model_coefficients.csv`, `results/models/fits.rds` (git-ignored) |
+| `analysis/01_fit_models.R` | Fits models A, B and C (weights 1/length) to all sequences, and to replicates 1–8 for a held-out check | `R/coefficients.R`, `results/tables/model_coefficients.csv`, `results/models/fits.rds` (git-ignored) |
 | `analysis/02_compare_models.R` | Fit statistics, held-out error, error by length band, residual diagnostics | `results/tables/model_comparison.csv`, `results/tables/rmse_by_length.csv`, `results/figures/rmse_by_length.*`, `results/figures/diagnostics/model_*.*` |
-| `analysis/03_figures.R` | Key figures: mean MFE vs length (by GC), mean MFE vs GC (by length) | `results/figures/mfe_vs_length.*`, `results/figures/mfe_vs_gc.*` |
+| `analysis/03_figures.R` | Key figures: mean MFE vs length (by GC), mean MFE vs GC (by length), model error vs length with human region lengths | `results/figures/mfe_vs_length.*`, `results/figures/mfe_vs_gc.*`, `results/figures/error_vs_length.*`, `results/tables/rel_error_by_length.csv` |
 
 `R/coefficients.R` is generated: don't edit it by hand. If a refit changes the
 coefficients, the package test in `tests/` fails on purpose, because downstream
@@ -80,7 +91,8 @@ R/                 package code: model definitions, generated coefficients, expe
 man/, tests/       package help pages and tests (R CMD check)
 analysis/          the fitting/comparison pipeline; analysis/R/ holds its helpers
 data-raw/          frozen inputs: RNAfold MFEs (*_rnafold_results.csv) and measured
-                   GC (*_actualGC.txt), split into length bands a–h
+                   GC (*_actualGC.txt), split into length bands a–h; plus
+                   human_region_summary.csv (real transcript lengths/GC, for context)
 results/           tables and figures produced by the pipeline
 docs/methods.md    methods, model comparison, limitations
 ```

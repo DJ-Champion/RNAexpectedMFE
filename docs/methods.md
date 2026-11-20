@@ -24,22 +24,31 @@ sequence was folded with RNAfold [TODO: ViennaRNA version] using default
 parameters.
 
 Three candidate models of MFE as a function of GC fraction (*G*) and length
-(*L*) were fitted by nonlinear least squares (R `nls`) to all individual
-sequences:
+(*L*) were fitted to all individual sequences by weighted nonlinear least
+squares (R `nls`):
 
 - A: MFE = (*a*·*G*² + *b*)·*L* + *c*
 - B: MFE = (*a*·*G*² + *b*)·*L* + (*c*·*G*² + *d*)
 - C: MFE = (*a*·*G*^*b* + *c*)·*L* + *d*
 
-Predictions were capped at 0 kcal/mol. Models were compared on R², root mean
-squared error (RMSE), Akaike and Bayesian information criteria, and the RMSE
-on held-out replicates (models refitted on replicates 1–8 of each design cell
-and evaluated on replicates 9–10). Model C fitted best (R² = 0.9994, RMSE =
-19.0 kcal/mol, compared with 43.0 for A and B, ΔAIC > 6.6 × 10⁵), with
-identical in-sample and held-out error (19.0 kcal/mol), indicating no
-overfitting. The fitted model was
+Weights were inversely proportional to length, because the variance of MFE
+among replicate sequences increased approximately linearly with length
+(variance ∝ *L*^0.87). Predictions were capped at 0 kcal/mol.
 
-  E[MFE] = min{(−0.8403·*G*^2.352 − 0.1534)·*L* + 13.56, 0}  kcal/mol.
+Models were compared using:
+- weighted root mean squared error (RMSE);
+- Akaike and Bayesian information criteria;
+- relative error of replicate means within length bands;
+- RMSE on held-out replicates (models refitted on replicates 1–8 of each
+  design cell and evaluated on replicates 9–10).
+
+Model C fitted best (weighted RMSE 11.1 vs 23.1 kcal/mol for A and B;
+ΔAIC > 5.9 × 10⁵), with near-identical in-sample and held-out error,
+indicating no overfitting. For sequences of 100–4000 nt at 30–70% GC, its
+median absolute relative error was 3.5% or less in every length band. The fitted
+model was
+
+  E[MFE] = min{(−0.8392·*G*^2.354 − 0.1517)·*L* + 9.318, 0}  kcal/mol.
 
 For each transcript, the expected MFE was computed from its GC content and
 length, and compared with its observed RNAfold MFE [TODO: as the difference
@@ -60,90 +69,133 @@ observed − expected, as used downstream].
 | Measured vs target GC | median difference 0; up to 10 percentage points for the shortest sequences |
 | MFE range | −4064 to 0 kcal/mol |
 
+`data-raw/human_region_summary.csv` holds length and GC summaries (min,
+quartiles, max) for 5′ UTR, CDS, 3′ UTR and full mRNA of about 13,000 human
+representative transcripts, from the `mRNA_stability_R` project. It is used
+only to show where real regions fall in `error_vs_length`.
+
 **Provenance gaps.** The sequence-generation script and the RNAfold version
 were not kept. RNAfold is believed to have run with default settings: 37 °C,
-plus the Turner 2004 energy parameters if it was ViennaRNA 2.x. The CSVs are therefore frozen
-inputs. If the dataset is ever regenerated, record the generator, its seed
-and `RNAfold --version` alongside it.
+plus the Turner 2004 energy parameters if it was ViennaRNA 2.x. The CSVs are
+therefore frozen inputs. If the dataset is ever regenerated, record the
+generator, its seed and `RNAfold --version` alongside it.
 
 ### Fitting choices
 
 - **Individual sequences, not cell means.** Every sequence is a data point, so
   the fit reflects the real spread of MFE. Cell means are used only for plots
-  and the systematic-error metric.
+  and the systematic-error metrics.
 - **Measured GC, not target GC.** Short sequences can't hit the target exactly,
   and the model is applied to real transcripts using their measured GC.
-- **Unweighted, full range.** All GC levels (0–100%) and lengths are used with
-  equal weight, since the model is meant for broad use. Weighted fits and a
-  filtered (GC 20–80%, ≥ 60 nt) variant were tried earlier. They moved the
-  coefficients only slightly and were dropped for simplicity.
+- **Full range.** All GC levels (0–100%) and lengths are used, since the model
+  is meant for broad use.
+- **Weights 1/length.** Ordinary least squares assumes every point is equally
+  noisy. Here the SD between replicates rises from about 2 kcal/mol at
+  ≤ 50 nt to about 14 at 2–4 kb. Unweighted, the long sequences effectively
+  set every coefficient, including the intercept, which only matters for
+  short sequences. That left short sequences 16–37% under-predicted at
+  50–150 nt. The optimal weight is 1/variance.
+  - **Measured scaling:** replicate variance scales as length^0.87 overall
+    (0.83–0.90 across GC levels). It is also about 2× higher at high GC than
+    at low GC, which is small next to the ~70× change across the length range.
+  - **Robust to the exponent:** weights of 1/L^0.8, 1/L^0.9 and 1/L give
+    d = 10.2, 9.75 and 9.32, with a, b and c unchanged to 3–4 significant
+    figures. Plain 1/L was chosen because it is the simplest and has a
+    one-sentence justification.
+  - **What it changed:** for model C, only the intercept moved much
+    (d: 13.56 → 9.32). a, b and c changed in the third decimal.
 - **Cap at prediction time, not during fitting.** The 0 kcal/mol cap is applied
   by `expected_mfe()`. Fitting a smooth surface keeps the optimisation
-  well-behaved and gives exactly the coefficients that downstream code uses.
-  For model C the cap only bites below about 90 nt at 0% GC, and at shorter
-  lengths as GC rises (below about 14 nt at 100% GC).
+  well-behaved. For model C the cap only bites below about 61 nt at 0% GC,
+  and at shorter lengths as GC rises (below about 9 nt at 100% GC).
 
 ### Model comparison
 
 From `results/tables/model_comparison.csv` (n = 406,470):
 
-| Model | Params | R² | RMSE | MAE | Cell-mean RMSE | Held-out RMSE | ΔAIC |
+| Model | Params | R² | RMSE | Weighted RMSE | Cell-mean RMSE | Held-out RMSE | ΔAIC |
 |---|---|---|---|---|---|---|---|
-| A | 3 | 0.99671 | 42.99 | 29.77 | 41.47 | 42.94 | 663,858 |
-| B | 4 | 0.99672 | 42.97 | 29.70 | 41.45 | 42.92 | 663,407 |
-| C | 4 | 0.99936 | 18.99 | 13.92 | 15.24 | 18.97 | 0 |
+| A | 3 | 0.99670 | 43.07 | 23.10 | 41.56 | 43.02 | 592,774 |
+| B | 4 | 0.99671 | 43.04 | 23.06 | 41.53 | 42.99 | 590,054 |
+| C | 4 | 0.99935 | 19.17 | 11.06 | 15.46 | 19.15 | 0 |
 
 Errors are in kcal/mol, on capped predictions.
+- **RMSE (unweighted)** is shown for reference only. Unweighted least squares
+  minimises it by construction, so weighted fits always look slightly worse
+  on it (for model C, 18.99 unweighted vs 19.17 weighted).
+- **Weighted RMSE** uses the same 1/length weights as the fit, so it is the
+  fair overall comparison.
 - **Cell-mean RMSE** compares the model with the mean of the 10 replicates in
-  each length × GC cell. It is the systematic part of the error, with replicate
+  each length × GC cell: the systematic part of the error, with replicate
   noise averaged out.
-- **Held-out RMSE** is from models refitted on replicates 1–8 and scored on
-  replicates 9–10.
+- **Held-out RMSE** comes from models refitted on replicates 1–8 and scored
+  on replicates 9–10.
 
 **Reading it.**
-- **A vs B:** B adds a GC term to the intercept, which barely helps (RMSE
-  42.99 → 42.97). The length-independent part of MFE is negligible beyond the
-  shortest sequences.
+- **A vs B:** B adds a GC term to the intercept, which barely helps. The
+  length-independent part of MFE is small beyond the shortest sequences.
 - **Why C wins:** letting the GC exponent vary, rather than fixing it at 2,
-  roughly halves the error (b ≈ 2.35). The GC dependence of MFE per
-  nucleotide is steeper than quadratic.
+  halves the error (b ≈ 2.35). The GC dependence of MFE per nucleotide is
+  steeper than quadratic.
 - **No overfitting:** held-out RMSE equals in-sample RMSE for all three
-  models. With 3–4 parameters and 400k points this is expected, but it is
-  now shown rather than assumed.
+  models. Refit on replicates 1–8, model C gives a = −0.83921, b = 2.35370,
+  c = −0.15176, d = 9.33.
 
-**Error by length** (`results/tables/rmse_by_length.csv`, model C):
+**Error by length** (`results/tables/rmse_by_length.csv`, model C). Relative
+errors are medians over design cells at 30–70% GC. Negative means the model
+predicts too little structure.
 
-| Length band (nt) | RMSE | Cell-mean RMSE | Replicate SD |
-|---|---|---|---|
-| 20–100 | 5.7 | 5.1 | 2.8 |
-| 100–500 | 6.5 | 4.1 | 5.3 |
-| 500–1000 | 9.4 | 5.8 | 7.8 |
-| 1000–2000 | 14.4 | 10.4 | 10.5 |
-| 2000–4000 | 24.2 | 19.9 | 14.4 |
+| Length (nt) | RMSE | Cell-mean RMSE | Replicate SD | Median relative error | Median absolute relative error |
+|---|---|---|---|---|---|
+| 20–50 | 3.2 | 2.4 | 2.3 | −64% | 64% |
+| 50–100 | 4.1 | 2.8 | 3.1 | −13% | 13% |
+| 100–150 | 4.4 | 2.6 | 3.9 | −2.4% | 3.5% |
+| 150–250 | 5.3 | 3.1 | 4.5 | +0.2% | 2.4% |
+| 250–500 | 7.0 | 4.4 | 5.9 | +0.8% | 1.5% |
+| 500–1000 | 9.9 | 6.6 | 7.8 | +0.3% | 1.0% |
+| 1000–2000 | 14.5 | 10.5 | 10.5 | −0.5% | 0.9% |
+| 2000–4000 | 24.4 | 20.2 | 14.4 | −1.3% | 1.3% |
 
 The replicate SD is the pooled SD between the 10 replicates of each design
 cell. It is roughly the error any GC + length model must make on an individual
-sequence. Model C sits close to this floor up to about 1000 nt. Beyond that, a
-systematic component of similar size remains.
+sequence. Model C is close to this floor from about 100 to 1000 nt. Beyond
+that, a systematic component of similar size remains (about 1% of the MFE).
 
 ### Where model C misfits
 
-From `results/figures/diagnostics/model_C.png`:
+From `results/figures/diagnostics/model_C.png` and
+`results/figures/error_vs_length.png`:
 
+- **Very short sequences: structural, not fixable by weighting.** Below about
+  100 nt the model still predicts too little structure (−13% at 50–100 nt,
+  worse below 50 nt). This is a limitation of the model's shape: real MFE
+  stays near 0 until sequences are long enough to form a hairpin, then bends
+  sharply before becoming linear in length, and a single constant intercept
+  can't follow that.
+  - Weighting moved where the model compromises (before weighting it was
+    −37% at 50–100 nt and −16% at 100–150 nt) but cannot remove this bias.
+  - For human 5′ UTRs (quartiles 90 / 163 / 286 nt), roughly the shortest
+    quarter are in this zone.
+- **Long sequences: slight drift and extrapolation.** The error trends
+  gently negative with length, reaching −1.3% at 2–4 kb.
+  - About 40% of full human mRNAs, and the upper tails of CDS and 3′ UTRs,
+    are longer than 4000 nt, up to about 35 kb. Their expected MFE is an
+    extrapolation.
+  - The model is linear in length and the data are very straight up to 4 kb,
+    so the extrapolation is plausible, but it is untested. Folding a small
+    validation set of random sequences at 5–30 kb would settle it.
 - **GC extremes.** At ≤ 6% and ≥ 96% GC, observed MFE is more negative than
-  predicted: pure A/U or pure G/C sequences still pair. This reaches about
-  −80 kcal/mol at 4000 nt. Few real mRNAs sit there.
+  predicted, because pure A/U or pure G/C sequences still pair (up to about
+  −80 kcal/mol at 4000 nt). Human transcript regions span 18–94% GC
+  (quartiles within 36–75%), so this does not affect real data.
 - **A gentle wave across GC.** For long sequences the model is slightly too
   negative around 10–25% and 75–90% GC (residual up to about +30 kcal/mol),
-  and slightly not negative enough around 35–60% (about −25 kcal/mol). Relative
-  to MFEs of −1000 to −2000 kcal/mol at these lengths, that is around 1–2%.
-- **Short sequences.** Below about 100 nt the constant intercept (d ≈ 13.6) and
-  the 0 cap dominate, and the error is large relative to the small MFEs there.
+  and slightly not negative enough around 35–60% (about −30 kcal/mol), i.e.
+  around 1–2% of the MFE.
 
-None of this affects the ranking of the three candidates. A more flexible GC
-term could reduce the wave. Sine terms and 4th-order polynomials were tried
-early on but not carried forward: they added parameters, were hard to
-interpret, and were never compared on equal terms.
+None of this affects the ranking of the three candidates. Sine terms,
+4th-order polynomials and a log(length) term were tried but not carried
+forward: they add parameters and break the like-for-like A/B/C comparison.
 
 ### Caveats for downstream use
 
@@ -152,12 +204,48 @@ interpret, and were never compared on equal terms.
   random* sequence, not for "typical mRNA". Real transcripts differ from this
   baseline partly because of codon usage and dinucleotide bias, not only
   because of selected structure.
-- **Standard errors are nominal.** Residual variance grows with length, which
-  violates the constant-variance assumption of `nls`. The coefficient SEs and
-  CIs in `model_coefficients.csv` are far too small and should not be
-  reported as real uncertainty. The coefficients themselves are robust. Refit
-  on replicates 1–8, model C gives a = −0.84034, b = 2.35226, c = −0.15341,
-  d = 13.55. Earlier length/GC-weighted fits changed a, b and c only in the
-  third decimal, though they shifted the intercept d (to about 16–17).
+- **observed − expected is not comparable across lengths.** Its noise grows
+  with length (replicate SD from about 2 to 14 kcal/mol), so a 5 kcal/mol
+  difference means much more for a 100-nt region than a 3000-nt one. A z-score,
+  (observed − expected) / SD(length, GC), would fix this, but:
+  - the SD model must be built and then **checked on held-out random
+    sequences**: z should have mean ≈ 0 and SD ≈ 1 in every length band;
+  - any remaining bias in the mean (e.g. the −13% at 50–100 nt) shows up as
+    non-zero mean z for short random sequences, so the SD alone does not
+    guarantee calibrated z-scores.
+- **Standard errors are approximate.** With 1/length weights the
+  constant-variance assumption roughly holds (variance ∝ L^0.87), so the SEs
+  in `model_coefficients.csv` are far more realistic than in an unweighted
+  fit. They still ignore the GC dependence of the variance and the
+  functional-form bias above.
 - **Units.** `expected_mfe()` takes GC as a fraction and rejects values above
   1.
+
+### Figure legends (drafts)
+
+The figures carry no captions, so these legends can be edited into a paper.
+
+**`results/figures/mfe_vs_length`.** Mean RNAfold MFE against sequence length
+for synthetic sequences at target GC contents of 0–100% (10% steps shown).
+Coloured lines: mean of 10 random sequences per length (5-nt steps). Black
+dashed lines: expected MFE from model C at each sequence set's mean measured
+GC.
+
+**`results/figures/mfe_vs_gc`.** Mean RNAfold MFE against measured GC content
+for selected sequence lengths. Points: mean of 10 random sequences per target
+GC (2% steps). Black dashed lines: expected MFE from model C.
+
+**`results/figures/error_vs_length`.** Top: median relative error of models
+A–C on the synthetic random sequences used for fitting ((observed − expected)
+/ |observed|, replicate means at 30–70% GC) against sequence length. No human
+transcript data are used in this panel. Negative values mean the model predicts too little structure.
+The axis is cut at −50%; below about 40 nt errors approach −100%. Grey: beyond
+the 4000-nt training range. Bottom, for reference only: lengths of human
+transcript regions (about 13,000 representative transcripts), showing which
+part of the length axis real regions occupy. Bars: interquartile range;
+circles: median; lines: full range.
+
+**`results/figures/rmse_by_length`.** Prediction error of models A–C by length
+band. Left: RMSE on individual sequences. Dashed grey: pooled SD between the
+10 replicate sequences in each length × GC cell (approximate noise floor).
+Right: RMSE against the replicate means of each cell, i.e. systematic error.

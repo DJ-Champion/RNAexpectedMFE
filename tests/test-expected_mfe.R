@@ -14,10 +14,11 @@ expect_message <- function(expr, pattern) {
   stopifnot(!is.null(msg), grepl(pattern, msg))
 }
 
-# Model C reproduces the coefficients hard-coded in downstream projects
-# (mRNA_stability_R, RNAstab). A refit that drifts from them should fail here.
+# Model C reproduces its published coefficients (1/length-weighted fit). A
+# refit that drifts from them should fail here: downstream projects
+# (mRNA_stability_R, RNAstab) hard-code these values and must be updated too.
 reference_c <- function(gc, length) {
-  pmin((-0.8403211 * gc^2.3521348 - 0.1534111) * length + 13.5600933, 0)
+  pmin((-0.8392021 * gc^2.3535788 - 0.1517445) * length + 9.3178327, 0)
 }
 gc <- c(0, 0.25, 0.5, 0.75, 1)
 len <- c(20, 100, 1000, 2500, 4000)

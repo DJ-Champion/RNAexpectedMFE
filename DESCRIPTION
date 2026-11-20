@@ -2,7 +2,7 @@ Package: RNAexpected
 Title: Expected RNA Minimum Free Energy from GC Content and Length
 Version: 0.1.0
 Authors@R:
-    person("fienx", email = "djchamp@gmail.com", role = c("aut", "cre"))
+    person("DJ", "Champion", email = "djchamp@gmail.com", role = c("aut", "cre"))
 Description: Predicts the minimum free energy (MFE) that RNAfold gives, on
     average, for a random RNA sequence of a given GC content and length. The
     models were fitted to 406,470 synthetic sequences (20-4000 nt, 0-100% GC)
