@@ -78,7 +78,7 @@ This takes about 2 minutes and needs `dplyr`, `ggplot2`, `patchwork`, `purrr`,
 |---|---|---|
 | `analysis/01_fit_models.R` | Fits models A, B and C (weights 1/length) to all sequences, and to replicates 1–8 for a held-out check | `R/coefficients.R`, `results/tables/model_coefficients.csv`, `results/models/fits.rds` (git-ignored) |
 | `analysis/02_compare_models.R` | Fit statistics, held-out error, error by length band, residual diagnostics | `results/tables/model_comparison.csv`, `results/tables/rmse_by_length.csv`, `results/figures/rmse_by_length.*`, `results/figures/diagnostics/model_*.*` |
-| `analysis/03_figures.R` | Key figures: mean MFE vs length (by GC), mean MFE vs GC (by length), model error vs length with human region lengths | `results/figures/mfe_vs_length.*`, `results/figures/mfe_vs_gc.*`, `results/figures/error_vs_length.*`, `results/tables/rel_error_by_length.csv` |
+| `analysis/03_figures.R` | Key figures: mean MFE vs length (by GC) and mean MFE vs GC (by length), one version per model in `figure_models` (default C); model error vs length with human region lengths | `results/figures/mfe_vs_length_model_C.*`, `results/figures/mfe_vs_gc_model_C.*`, `results/figures/error_vs_length.*`, `results/tables/rel_error_by_length.csv` |
 
 `R/coefficients.R` is generated: don't edit it by hand. If a refit changes the
 coefficients, the package test in `tests/` fails on purpose, because downstream

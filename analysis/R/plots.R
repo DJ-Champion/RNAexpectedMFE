@@ -60,12 +60,13 @@ save_figure <- function(plot, name, width = 8, height = 5,
 
 # --- Key figures --------------------------------------------------------------
 #
-# Both figures use the same encoding: observed means in colour, the model as a
-# black dashed line. Each has a linear and a log version. MFE is negative, so
-# the log version plots it on a log scale of its magnitude while keeping the
-# sign and orientation: -1, -10, -100, -1000 run down the axis. Zero MFEs
-# (short, GC-poor sequences, and the capped model there) cannot be shown on
-# that scale and are dropped.
+# Both figures are drawn for one model at a time: observed means as filled
+# circles, the model's expected MFE as open circles in the same colour, with
+# the model's formula and fitted coefficients in the subtitle. Each has a
+# linear and a log version. MFE is negative, so the log version plots it on a
+# log scale of its magnitude while keeping the sign and orientation: -1, -10,
+# -100, -1000 run down the axis. Zero MFEs (short, GC-poor sequences, and the
+# capped model there) cannot be shown on that scale and are dropped.
 
 key_figure_size <- 16
 key_figure_gc <- seq(0, 100, 10)
@@ -87,57 +88,102 @@ scale_y_mfe <- function(log = FALSE) {
   }
 }
 
-model_key <- function(model) {
-  scale_linetype_manual(values = set_names("22", paste("Model", model)),
-                        name = NULL)
+# Filled = observed, open = model. Keys are drawn in ink so they read as a
+# shape legend, separate from the colour legend.
+observed_label <- "Observed (mean of 10)"
+point_key <- function(model) {
+  scale_shape_manual(values = set_names(c(16, 1),
+                                        c(observed_label, paste("Model", model))),
+                     name = NULL)
 }
 
-plot_mfe_vs_length <- function(cells, model = "C", gc_levels = key_figure_gc,
-                               log = FALSE) {
-  d <- filter(cells, target_GC %in% gc_levels) |>
-    mutate(gc = factor(target_GC, levels = gc_levels))
-  if (log) d <- filter(d, MFE < 0)
+# Two-line subtitle: the model's formula, then its fitted coefficients.
+model_subtitle <- function(model) {
+  formula <- deparse1(mfe_models[[model]]$formula) |>
+    str_replace_all("GC_content", "GC") |>
+    str_replace_all(" \\* ", " × ") |>
+    str_replace("~", "=")
+  cf <- mfe_coefficients[[model]]
+  coefs <- paste0(names(cf), " = ", formatC(cf, digits = 4, format = "fg"),
+                  collapse = ",  ")
+  paste0("Model ", model, ": ", formula, "\n", coefs)
+}
 
-  p <- ggplot(d, aes(length, colour = gc, group = gc)) +
-    geom_line(aes(y = MFE), linewidth = 0.7) +
-    geom_line(data = if (log) filter(d, expected < 0) else d,
-              aes(y = expected, linetype = paste("Model", model)),
-              colour = ink, linewidth = 0.45) +
+# Observed means and the model's expected MFE stacked into one column, so
+# both can share the colour scale and be told apart by shape.
+observed_vs_expected <- function(d, model, log) {
+  d <- mutate(d, expected = expected_mfe(GC_content, length, model = model))
+  long <- bind_rows(
+    mutate(d, value = MFE, source = observed_label),
+    mutate(d, value = expected, source = paste("Model", model))
+  ) |>
+    mutate(source = factor(source, levels = c(observed_label,
+                                              paste("Model", model))))
+  if (log) long <- filter(long, value < 0)
+  long
+}
+
+key_figure_guides <- function() {
+  guides(colour = guide_legend(order = 1, override.aes = list(shape = 16)),
+         shape = guide_legend(order = 2,
+                              override.aes = list(colour = ink, size = 3)))
+}
+
+# Lengths come in 5-nt steps; points are shown at the shortest length and every
+# `length_step` nt (or at ~40 log-spaced lengths on the log axis) so open and
+# filled circles stay distinguishable.
+plot_mfe_vs_length <- function(cells, model = "C", gc_levels = key_figure_gc,
+                               log = FALSE, length_step = 100) {
+  all_lengths <- sort(unique(cells$length))
+  shown <- if (log) {
+    targets <- 10^seq(log10(min(all_lengths)), log10(max(all_lengths)),
+                      length.out = 40)
+    unique(all_lengths[map_int(targets, \(x) which.min(abs(all_lengths - x)))])
+  } else {
+    all_lengths[all_lengths %% length_step == 0 | all_lengths == min(all_lengths)]
+  }
+
+  d <- filter(cells, target_GC %in% gc_levels, length %in% shown) |>
+    observed_vs_expected(model, log) |>
+    mutate(gc = factor(target_GC, levels = gc_levels))
+
+  p <- ggplot(d, aes(length, value, colour = gc, shape = source)) +
+    geom_point(size = 2, stroke = 0.7) +
     scale_colour_manual(values = colorRampPalette(blue_ramp)(length(gc_levels)),
                         name = "GC (%)") +
-    model_key(model) +
+    point_key(model) +
     scale_y_mfe(log) +
-    guides(colour = guide_legend(order = 1), linetype = guide_legend(order = 2)) +
+    key_figure_guides() +
     labs(title = paste0("Mean MFE vs sequence length, by GC content",
                         if (log) " (log scale)"),
+         subtitle = model_subtitle(model),
          x = "Sequence length (nt)", y = "Mean MFE (kcal/mol)") +
     theme_rnaexpected(key_figure_size)
 
   if (log) {
     p + scale_x_log10(breaks = c(20, 50, 100, 200, 500, 1000, 2000, 4000))
   } else {
-    p + scale_x_continuous(breaks = seq(0, 4000, 1000), expand = expansion(0.01))
+    p + scale_x_continuous(breaks = seq(0, 4000, 1000), limits = c(0, NA),
+                           expand = expansion(0.01))
   }
 }
 
 plot_mfe_vs_gc <- function(cells, model = "C", lengths = selected_lengths,
                            log = FALSE) {
   d <- filter(cells, length %in% lengths) |>
+    observed_vs_expected(model, log) |>
     mutate(length = factor(length, levels = lengths))
-  if (log) d <- filter(d, MFE < 0)
 
-  ggplot(d, aes(GC_content * 100, colour = length, group = length)) +
-    geom_point(aes(y = MFE), size = 2) +
-    geom_line(data = if (log) filter(d, expected < 0) else d,
-              aes(y = expected, linetype = paste("Model", model)),
-              colour = ink, linewidth = 0.45) +
+  ggplot(d, aes(GC_content * 100, value, colour = length, shape = source)) +
+    geom_point(size = 2, stroke = 0.7) +
     scale_colour_length() +
-    model_key(model) +
+    point_key(model) +
     scale_y_mfe(log) +
     scale_x_continuous(breaks = seq(0, 100, 20), expand = expansion(0.01)) +
-    guides(colour = guide_legend(order = 1), linetype = guide_legend(order = 2)) +
+    key_figure_guides() +
     labs(title = paste0("Mean MFE vs GC content, by sequence length",
                         if (log) " (log scale)"),
+         subtitle = model_subtitle(model),
          x = "Measured GC content (%)", y = "Mean MFE (kcal/mol)") +
     theme_rnaexpected(key_figure_size)
 }

@@ -225,15 +225,20 @@ forward: they add parameters and break the like-for-like A/B/C comparison.
 
 The figures carry no captions, so these legends can be edited into a paper.
 
-**`results/figures/mfe_vs_length`.** Mean RNAfold MFE against sequence length
-for synthetic sequences at target GC contents of 0–100% (10% steps shown).
-Coloured lines: mean of 10 random sequences per length (5-nt steps). Black
-dashed lines: expected MFE from model C at each sequence set's mean measured
-GC.
+**`results/figures/mfe_vs_length_model_C`.** Mean RNAfold MFE against
+sequence length for synthetic sequences at target GC contents of 0–100% (10%
+steps shown). Filled circles: mean of 10 random sequences per length, shown
+at 20 nt and every 100 nt (lengths were sampled in 5-nt steps). Open circles:
+expected MFE from model C at each sequence set's mean measured GC. The
+subtitle gives the model formula and fitted coefficients.
 
-**`results/figures/mfe_vs_gc`.** Mean RNAfold MFE against measured GC content
-for selected sequence lengths. Points: mean of 10 random sequences per target
-GC (2% steps). Black dashed lines: expected MFE from model C.
+**`results/figures/mfe_vs_gc_model_C`.** Mean RNAfold MFE against measured GC
+content for selected sequence lengths. Filled circles: mean of 10 random
+sequences per target GC (2% steps). Open circles: expected MFE from model C.
+The subtitle gives the model formula and fitted coefficients.
+
+Versions for models A and B can be made by setting `figure_models` in
+`analysis/03_figures.R`; they are saved as `*_model_A` and `*_model_B`.
 
 **`results/figures/error_vs_length`.** Top: median relative error of models
 A–C on the synthetic random sequences used for fitting ((observed − expected)
