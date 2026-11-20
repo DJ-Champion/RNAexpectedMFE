@@ -166,7 +166,7 @@ plot_mfe_vs_length <- function(cells, model = "C", gc_levels = key_figure_gc,
     labs(title = paste0("Mean MFE vs sequence length, by GC content",
                         if (log) " (log scale)"),
          subtitle = model_subtitle(model),
-         x = "Sequence length (nt)", y = "Mean MFE (kcal/mol)") +
+         x = "length (nt)", y = "Mean MFE (kcal/mol)") +
     theme_rnaexpected(key_figure_size)
 
   if (log) {
@@ -193,7 +193,7 @@ plot_mfe_vs_gc <- function(cells, model = "C", lengths = selected_lengths,
     labs(title = paste0("Mean MFE vs GC content, by sequence length",
                         if (log) " (log scale)"),
          subtitle = model_subtitle(model),
-         x = "Measured GC content (%)", y = "Mean MFE (kcal/mol)") +
+         x = "GC (%)", y = "Mean MFE (kcal/mol)") +
     theme_rnaexpected(key_figure_size)
 }
 
