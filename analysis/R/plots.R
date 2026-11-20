@@ -1,6 +1,7 @@
 # Plot helpers. Colour roles:
 #   - GC content and length are magnitudes -> one blue ramp, light to dark
-#     (starting at step 250 so the lightest line still reads on white).
+#     (starting at step 250 so the lightest line still reads on the
+#     light grey panel).
 #   - Models A/B/C are identities -> fixed categorical slots, in that order.
 #   - Residual sign is polarity -> blue/red diverging around a neutral grey.
 
@@ -10,6 +11,10 @@ model_colours <- c(A = "#2a78d6", B = "#eb6834", C = "#1baf7a")
 ink <- "#0b0b0b"
 ink_muted <- "#52514e"
 neutral_mid <- "#f0efec"
+# Panels sit on a light grey ground inside a border, with gridlines a step
+# darker than the ground so they read but stay quiet.
+panel_fill <- "#f5f4f1"
+grid_colour <- "#dfddd8"
 
 # Lengths shown when a plot needs a handful of representative lines.
 selected_lengths <- c(50, 100, 250, 500, 1000, 2000, 3000, 4000)
@@ -17,8 +22,10 @@ selected_lengths <- c(50, 100, 250, 500, 1000, 2000, 3000, 4000)
 theme_rnaexpected <- function(base_size = 11) {
   theme_minimal(base_size = base_size) +
     theme(
+      panel.background = element_rect(fill = panel_fill, colour = NA),
+      panel.border = element_rect(colour = ink_muted, fill = NA, linewidth = 0.6),
       panel.grid.minor = element_blank(),
-      panel.grid.major = element_line(colour = "#e6e5e1", linewidth = 0.3),
+      panel.grid.major = element_line(colour = grid_colour, linewidth = 0.35),
       axis.title = element_text(colour = ink_muted),
       axis.text = element_text(colour = ink_muted),
       plot.title = element_text(colour = ink, face = "bold"),
@@ -90,23 +97,25 @@ scale_y_mfe <- function(log = FALSE) {
 
 # Filled = observed, open = model. Keys are drawn in ink so they read as a
 # shape legend, separate from the colour legend.
-observed_label <- "Observed (mean of 10)"
+observed_label <- "Observed"
 point_key <- function(model) {
   scale_shape_manual(values = set_names(c(16, 1),
                                         c(observed_label, paste("Model", model))),
                      name = NULL)
 }
 
-# Two-line subtitle: the model's formula, then its fitted coefficients.
+# Subtitle: the model's formula with its fitted coefficients filled in.
 model_subtitle <- function(model) {
+  cf <- mfe_coefficients[[model]]
+  values <- set_names(formatC(cf, digits = 3, format = "fg"),
+                      paste0("\\b", names(cf), "\\b"))
   formula <- deparse1(mfe_models[[model]]$formula) |>
+    str_replace_all(values) |>
+    str_replace_all("\\+ -", "- ") |>
     str_replace_all("GC_content", "GC") |>
     str_replace_all(" \\* ", " × ") |>
     str_replace("~", "=")
-  cf <- mfe_coefficients[[model]]
-  coefs <- paste0(names(cf), " = ", formatC(cf, digits = 4, format = "fg"),
-                  collapse = ",  ")
-  paste0("Model ", model, ": ", formula, "\n", coefs)
+  paste0("Model ", model, ": ", formula)
 }
 
 # Observed means and the model's expected MFE stacked into one column, so
@@ -257,7 +266,7 @@ plot_error_vs_length <- function(rel, regions) {
   x_limits <- c(20, 40000)
   x_breaks <- c(20, 50, 100, 250, 500, 1000, 2500, 5000, 10000, 30000)
   beyond <- annotate("rect", xmin = fitted_range$length[2], xmax = Inf,
-                     ymin = -Inf, ymax = Inf, fill = neutral_mid)
+                     ymin = -Inf, ymax = Inf, fill = "#e8e6e1")
   scale_x <- scale_x_log10(limits = x_limits, breaks = x_breaks,
                            labels = scales::label_number(big.mark = ","),
                            expand = c(0, 0))
